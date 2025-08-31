@@ -1,0 +1,1 @@
+An interactive quiz app built with HTML, CSS, and JavaScript. Includes a timer that changes color as it runs out, auto-submission when time ends, next/previous navigation, and a clean responsive interface.
