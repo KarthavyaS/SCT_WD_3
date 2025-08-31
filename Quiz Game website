@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CS Quiz — Full Featured</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --light-bg: linear-gradient(135deg,#e9e2fb,#d6ccf9);
+    --dark-bg: linear-gradient(135deg,#2a2546,#241f3a);
+    --card-light: #fff;
+    --card-dark: #2f2b44;
+    --accent: #7c5cf0;      /* current question highlight */
+    --choice: #5847c2;      /* choice base color */
+    --choice-contrast: #2e1e6b;
+    --correct: #27ae60;
+    --wrong: #e74c3c;
+    --muted: #9b93b8;
+    --text-light: #3a2b66;
+    --text-dark: #f2f2ff;
+  }
+  /* Basic reset & layout */
+  html,body{height:100%;margin:0;font-family:Roboto,Arial,Helvetica,sans-serif}
+  body{display:flex;align-items:center;justify-content:center;transition:background 400ms ease;}
+  .app {
+    width: 100%;
+    max-width: 1100px;
+    height: 86vh;
+    background: var(--card-light);
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(22,18,60,0.25);
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    overflow: hidden;
+    position: relative;
+    transition: background 300ms ease, color 300ms ease;
+  }
+
+  /* Sidebar (question numbers) */
+  .sidebar {
+    background: rgba(255,255,255,0.03);
+    padding: 18px 12px;
+    display:flex;flex-direction:column;gap:12px;
+    align-items:center;justify-content:flex-start;
+  }
+  .sidebar .logo { font-weight:700;color:var(--text-light); margin-bottom:6px; }
+  .qnums { width:100%; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .qbox {
+    width:34px;height:34px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600; cursor:pointer; user-select:none;
+    background: rgba(0,0,0,0.06); color:var(--muted);
+    transition: transform 160ms ease,background 160ms ease,color 160ms ease,box-shadow 160ms ease;
+  }
+  .qbox:hover{ transform:translateY(-3px); box-shadow:0 6px 14px rgba(0,0,0,0.08) }
+  .qbox.unanswered { background: #fbe7e7; color: #b43b3b; } /* red-ish */
+  .qbox.answered { background: #e6f6ec; color: #1f8b45; } /* green-ish */
+  .qbox.current { box-shadow: 0 6px 16px rgba(124,92,240,0.25); border:2px solid rgba(124,92,240,0.12); color: var(--text-light); background: rgba(124,92,240,0.08) }
+
+  /* Left nav extras */
+  .sidebar .controls { margin-top:auto; display:flex;flex-direction:column;gap:8px;width:100%; }
+  .small-btn { padding:8px 10px;border-radius:10px;border:none;background:#efe9ff;color:var(--text-light);cursor:pointer;font-weight:600 }
+  .small-btn:hover{ transform:translateY(-3px) }
+
+  /* Main area */
+  .main {
+    padding:22px 26px; display:flex;flex-direction:column; gap:16px; position:relative;
+  }
+  .top-row { display:flex;align-items:center;justify-content:space-between; gap:12px; }
+  .title { font-size:20px;font-weight:700;color:var(--text-light) }
+  .timer {
+    display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-light);
+    padding:8px 12px;border-radius:10px;background:rgba(0,0,0,0.04);
+    transition: background 200ms ease, transform 150ms ease, color 160ms ease;
+  }
+  .timer.alert { background: linear-gradient(90deg,#ffefef,#ffd7d7); color:var(--wrong); transform:scale(1.06); box-shadow:0 6px 20px rgba(231,76,60,0.12); }
+
+  .content {
+    display:grid; grid-template-columns: 1fr; gap:12px; align-items:start;
+  }
+  .question-row { display:flex; gap:16px; align-items:flex-start; }
+  .q-left {
+    width:66px; display:flex;flex-direction:column; gap:8px; align-items:center;
+  }
+  .qnum-box {
+    width:48px;height:48px;border-radius:10px;background:rgba(124,92,240,0.06);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text-light)
+  }
+  .q-main { flex:1; background:transparent; }
+  .q-text { font-size:18px;color:var(--text-light); margin:0 0 8px 0; }
+  .choices { display:flex;flex-direction:column; gap:10px; margin-top:8px; }
+  .choice-btn {
+    background: var(--choice);
+    color: #fff;
+    border:none;padding:12px 14px;border-radius:12px;text-align:center;
+    cursor:pointer;font-weight:700;font-size:15px; transition: transform 160ms ease, box-shadow 160ms ease, background 180ms ease;
+    box-shadow: 0 8px 20px rgba(90,70,200,0.08);
+  }
+  .choice-btn:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(90,70,200,0.12) }
+  .choice-btn.correct { background:var(--correct); box-shadow:0 12px 30px rgba(39,174,96,0.12) }
+  .choice-btn.wrong { background:var(--wrong); box-shadow:0 12px 30px rgba(231,76,60,0.12) }
+  .choice-input {
+    width:100%; padding:12px;border-radius:12px;border:1px solid rgba(0,0,0,0.08); font-size:15px;
+  }
+
+  /* nav buttons */
+  .nav-row { display:flex; gap:12px; margin-top:8px; }
+  .btn-primary { background:var(--accent); color:white; padding:12px 16px;border-radius:12px;border:none; font-weight:700; cursor:pointer }
+  .btn-ghost { background:transparent; color:var(--text-light); padding:12px 16px;border-radius:12px;border:1px solid rgba(0,0,0,0.06); cursor:pointer }
+  .btn-primary:disabled { opacity:0.5; cursor:default }
+
+  /* footer area: main menu + submit */
+  .footer {
+    display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:auto;
+  }
+
+  /* modal */
+  .overlay { position:fixed; inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center; z-index:60; }
+  .overlay.show { display:flex }
+  .modal { background:white;padding:20px;border-radius:12px;min-width:300px; text-align:center; }
+  .modal h3 { margin:6px 0 12px 0 }
+
+  /* dark mode styles (whole-page) */
+  .dark {
+    background: var(--dark-bg);
+  }
+  .dark .app { background: var(--card-dark); color:var(--text-dark) }
+  .dark .qbox { background: rgba(255,255,255,0.02); color:var(--muted) }
+  .dark .qbox.unanswered { background:#5b2b3a; color:#ffe6e6 }
+  .dark .qbox.answered { background:#214033; color:#bff0cf }
+  .dark .qbox.current { background: rgba(124,92,240,0.14); color:var(--text-dark) }
+  .dark .title, .dark .q-text, .dark .time { color:var(--text-dark) }
+  .dark .choice-btn { background:var(--bar-dark) }
+  .dark .choice-btn:hover { background:var(--bar-hover-dark) }
+  .dark .container { background:var(--card-dark) }
+
+  /* responsive */
+  @media (max-width:900px){
+    .app{ grid-template-columns: 90px 1fr; height:92vh }
+    .qnums{ grid-template-columns: repeat(2, 1fr) }
+  }
+  @media (max-width:600px){
+    .app{ grid-template-columns: 1fr; height:100vh; border-radius:0 }
+    .sidebar{ display:flex;flex-direction:row; gap:12px; padding:12px; overflow:auto; align-items:center}
+    .qnums{ grid-auto-flow:column; grid-auto-columns: 40px; grid-template-columns: none; gap:8px; }
+  }
+
+  /* timer pulse animation for last 5s */
+  @keyframes popPulse {
+    0%{ transform:scale(1) }
+    30%{ transform:scale(1.06) }
+    60%{ transform:scale(0.98) }
+    100%{ transform:scale(1) }
+  }
+  .timer.alert { animation: popPulse 900ms ease-in-out infinite; }
+</style>
+</head>
+<body>
+<!-- Root container -->
+<div id="rootWrapper" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+  <div class="app" id="app">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo">CS QUIZ</div>
+      <div class="qnums" id="qnums"></div>
+
+      <div class="controls">
+        <button class="small-btn" id="mainMenuBtn">🏠 Main Menu</button>
+        <button class="small-btn" id="modeToggle">🌙 Dark</button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+      <div class="top-row">
+        <div class="title">Computer Science Quiz</div>
+        <div class="timer" id="overallTimer">⏳ <span id="timeDisplay">05:00</span></div>
+      </div>
+
+      <div class="content">
+        <div class="question-row">
+          <div class="q-left">
+            <div class="qnum-box" id="currentQnum">1</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:6px">Question</div>
+          </div>
+          <div class="q-main">
+            <p class="q-text" id="questionText">Choose mode to start</p>
+            <div id="choicesWrap" class="choices"></div>
+
+            <div class="nav-row" style="margin-top:14px">
+              <button class="btn-ghost" id="prevBtn">◀ Prev</button>
+              <button class="btn-primary" id="nextBtn">Next ▶</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>
+          <button class="btn-ghost" id="restartBtn">Restart</button>
+          <button class="btn-ghost" id="mainMenuBtnBottom">Main Menu</button>
+        </div>
+        <div>
+          <button class="btn-primary" id="submitBtn">Submit Quiz</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal / overlay for results -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="resultModal">
+    <h3 id="resultTitle">Quiz Completed</h3>
+    <div id="resultBody"></div>
+    <div style="margin-top:12px">
+      <button class="btn-primary" id="restartFromModal">Restart</button>
+      <button class="btn-ghost" id="closeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   QUESTIONS (15 MCQ + 15 Fillups)
+   ========================= */
+const MCQS = [
+  {q:"Which data structure uses LIFO?", choices:["Stack","Queue","Linked List","Tree"], a:"Stack"},
+  {q:"What does CPU stand for?", choices:["Central Processing Unit","Computer Processing Unit","Control Processing Unit","Central Performance Unit"], a:"Central Processing Unit"},
+  {q:"Which sorting algorithm is fastest on average?", choices:["Bubble Sort","Quick Sort","Selection Sort","Insertion Sort"], a:"Quick Sort"},
+  {q:"Which language is used for client-side web scripting?", choices:["JavaScript","Python","C++","Java"], a:"JavaScript"},
+  {q:"What does HTML stand for?", choices:["HyperText Markup Language","HighText Machine Language","Hyper Tool Markup Language","Hyperloop Machine Language"], a:"HyperText Markup Language"},
+  {q:"Which is a NoSQL database?", choices:["MongoDB","MySQL","Oracle","PostgreSQL"], a:"MongoDB"},
+  {q:"Which is an OOP language?", choices:["Java","C","Assembly","COBOL"], a:"Java"},
+  {q:"What does CSS stand for?", choices:["Cascading Style Sheets","Computer Style Sheets","Creative Style System","Control Style Sheets"], a:"Cascading Style Sheets"},
+  {q:"Which is a linear data structure?", choices:["Queue","Graph","Tree","Heap"], a:"Queue"},
+  {q:"Which keyword is used for inheritance in Java?", choices:["extends","implements","inherits","super"], a:"extends"},
+  {q:"Which is a Python web framework?", choices:["Django","React","Spring","Laravel"], a:"Django"},
+  {q:"What is the time complexity of binary search?", choices:["O(log n)","O(n)","O(n log n)","O(1)"], a:"O(log n)"},
+  {q:"Which is a cloud service provider?", choices:["AWS","Git","Linux","VS Code"], a:"AWS"},
+  {q:"Which is a version control system?", choices:["Git","Docker","Kubernetes","Jenkins"], a:"Git"},
+  {q:"Which HTTP method is used to update resources?", choices:["PUT","GET","DELETE","POST"], a:"PUT"}
+];
+
+const FILLUPS = [
+  {q:"The brain of a computer is called ____.", a:"cpu"},
+  {q:"Binary system uses ____ and ____.", a:"0 and 1"},
+  {q:"Python is an ____ programming language.", a:"interpreted"},
+  {q:"A function that calls itself is called a ____ function.", a:"recursive"},
+  {q:"HTML is used to structure ____.", a:"web pages"},
+  {q:"CSS is used to style ____.", a:"web pages"},
+  {q:"The process of finding errors in code is called ____.", a:"debugging"},
+  {q:"Queue follows ____ order.", a:"fifo"},
+  {q:"Stack follows ____ order.", a:"lifo"},
+  {q:"The operator used to access object members in Java is ____.", a:"dot"},
+  {q:"In Python, lists are mutable but ____ are immutable.", a:"tuples"},
+  {q:"HTTP stands for ____.", a:"hypertext transfer protocol"},
+  {q:"SQL stands for ____.", a:"structured query language"},
+  {q:"The fastest memory in computer is ____.", a:"cache"},
+  {q:"A network connecting computers within a building is called ____.", a:"lan"}
+];
+
+/* ==============
+   App state
+   ============== */
+const TOTAL = 15;                 // count of questions (both arrays are length 15)
+let mode = null;                  // 'mcq' | 'fillup'
+let questions = [];               // current question set
+let answers = Array(TOTAL).fill(null); // user's answers, null = unanswered; for MCQ string choice, for fillup string answer
+let currentIndex = 0;
+let overallTime = 300;            // total seconds default (5 minutes). change if needed.
+let overallTimerInterval = null;
+let isDark = false;
+
+/* ==============
+   ELEMENTS
+   ============== */
+const qnumsWrap = document.getElementById('qnums');
+const questionText = document.getElementById('questionText');
+const choicesWrap = document.getElementById('choicesWrap');
+const currentQnum = document.getElementById('currentQnum');
+const timeDisplay = document.getElementById('timeDisplay');
+const overallTimerEl = document.getElementById('overallTimer');
+const appEl = document.getElementById('app');
+const rootWrapper = document.getElementById('rootWrapper');
+const overlay = document.getElementById('overlay');
+const resultBody = document.getElementById('resultBody');
+const resultTitle = document.getElementById('resultTitle');
+
+/* Controls */
+document.getElementById('modeToggle').addEventListener('click', toggleDark);
+document.getElementById('mainMenuBtn').addEventListener('click', showStartMenu);
+document.getElementById('mainMenuBtnBottom').addEventListener('click', showStartMenu);
+document.getElementById('restartBtn').addEventListener('click', ()=>startOver());
+document.getElementById('restartFromModal').addEventListener('click', ()=>{ closeModal(); startOver(); });
+document.getElementById('closeModal').addEventListener('click', closeModal);
+document.getElementById('prevBtn').addEventListener('click', ()=>changeQuestion(currentIndex-1));
+document.getElementById('nextBtn').addEventListener('click', ()=>changeQuestion(currentIndex+1));
+document.getElementById('submitBtn').addEventListener('click', finalizeQuiz);
+
+/* Start-mode buttons inside page (we'll attach delegation) */
+document.addEventListener('click', (e)=>{
+  if(e.target && e.target.matches('.mcq-mode')) {
+    initQuiz('mcq');
+  } else if(e.target && e.target.matches('.fillup-mode')) {
+    initQuiz('fillup');
+  }
+});
+
+/* show start menu on initial load */
+showStartMenu();
+
+/* ==============
+   UI Helpers
+   ============== */
+function showStartMenu(){
+  stopTimer();
+  mode = null;
+  questions = [];
+  answers = Array(TOTAL).fill(null);
+  currentIndex = 0;
+  overallTime = 300;
+  renderQuestionNums();
+  // show a minimal start panel inside main area
+  questionText.textContent = "Choose quiz mode to begin";
+  choicesWrap.innerHTML = `
+    <div style="display:flex;gap:12px">
+      <button class="choice-btn mcq-mode" style="background:var(--choice-contrast)">Start MCQs</button>
+      <button class="choice-btn fillup-mode" style="background:var(--accent)">Start Fillups</button>
+    </div>
+  `;
+  currentQnum.textContent = '-';
+  updateTimeDisplay(overallTime);
+}
+
+/* render left question number boxes */
+function renderQuestionNums(){
+  qnumsWrap.innerHTML = '';
+  for(let i=0;i<TOTAL;i++){
+    const box = document.createElement('div');
+    box.className = 'qbox';
+    box.textContent = i+1;
+    box.dataset.index = i;
+    if(answers[i] === null) box.classList.add('unanswered');
+    else box.classList.add('answered');
+    if(i === currentIndex) box.classList.add('current');
+    box.addEventListener('click', ()=> {
+      if(mode) changeQuestion(i);
+    });
+    qnumsWrap.appendChild(box);
+  }
+}
+
+/* update one qnum state when answer changes or current changes */
+function updateQnumState(idx){
+  const boxes = qnumsWrap.querySelectorAll('.qbox');
+  boxes.forEach(b=>b.classList.remove('current'));
+  const box = boxes[idx];
+  if(!box) return;
+  box.classList.add('current');
+  if(answers[idx] === null) {
+    box.classList.remove('answered'); box.classList.add('unanswered');
+  } else {
+    box.classList.remove('unanswered'); box.classList.add('answered');
+  }
+}
+
+/* ===========================
+   Quiz Initialization
+   =========================== */
+function initQuiz(selectedMode){
+  mode = selectedMode;
+  questions = (mode === 'mcq') ? MCQS.slice(0,TOTAL) : FILLUPS.slice(0,TOTAL);
+  answers = Array(TOTAL).fill(null);
+  currentIndex = 0;
+  renderQuestionNums();
+  startOverallTimer();
+  renderCurrentQuestion();
+}
+
+/* ===========================
+   Timer logic (overall)
+   =========================== */
+function startOverallTimer(){
+  stopTimer(); // clear if any
+  overallTimerInterval = setInterval(()=>{
+    overallTime--;
+    updateTimeDisplay(overallTime);
+    if(overallTime <= 5) {
+      overallTimerEl.classList.add('alert');
+      // small pop effect handled via CSS keyframes
+    } else {
+      overallTimerEl.classList.remove('alert');
+    }
+    if(overallTime <= 0) {
+      stopTimer();
+      overallTime = 0;
+      updateTimeDisplay(0);
+      // time up => finalize quiz
+      setTimeout(()=> finalizeQuiz(true), 300); // slight delay for UI
+    }
+  }, 1000);
+}
+
+/* stop timer */
+function stopTimer(){
+  if(overallTimerInterval) { clearInterval(overallTimerInterval); overallTimerInterval = null; overallTimerEl.classList.remove('alert'); }
+}
+
+/* display mm:ss */
+function updateTimeDisplay(sec){
+  const mm = String(Math.floor(sec/60)).padStart(2,'0');
+  const ss = String(sec%60).padStart(2,'0');
+  timeDisplay.textContent = `${mm}:${ss}`;
+}
+
+/* ===========================
+   Rendering question + choices
+   =========================== */
+function renderCurrentQuestion(){
+  // bounds check
+  if(currentIndex < 0) currentIndex = 0;
+  if(currentIndex >= TOTAL) currentIndex = TOTAL-1;
+
+  updateQnumState(currentIndex);
+  currentQnum.textContent = currentIndex+1;
+
+  const q = questions[currentIndex];
+  questionText.textContent = q ? q.q : "No question";
+
+  // build choices area
+  choicesWrap.innerHTML = '';
+
+  if(mode === 'mcq') {
+    // show MCQ choices as buttons (vertical stacked)
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bar-list';
+    q.choices.forEach(choice => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = choice;
+      // if already answered, color buttons according to correctness
+      if(answers[currentIndex] !== null) {
+        if(answers[currentIndex] === q.a && choice === q.a) btn.classList.add('correct');
+        else if(answers[currentIndex] !== q.a && choice === answers[currentIndex]) btn.classList.add('wrong');
+        else btn.style.opacity = 0.95;
+        btn.disabled = false;
+      }
+      btn.addEventListener('click', ()=> {
+        // record answer
+        answers[currentIndex] = choice;
+        // mark left panel
+        updateQnumState(currentIndex);
+        // style buttons to show correct/wrong
+        showChoiceFeedback(choice);
+        // auto-next after short delay
+        setTimeout(()=> changeQuestion(currentIndex+1), 700);
+      });
+      wrapper.appendChild(btn);
+    });
+    choicesWrap.appendChild(wrapper);
+  } else {
+    // fill-up: show input + submit small button
+    const input = document.createElement('input');
+    input.className = 'choice-input';
+    input.type = 'text';
+    input.placeholder = 'Type your answer here';
+    input.value = (answers[currentIndex] || '');
+    choicesWrap.appendChild(input);
+
+    const submitInline = document.createElement('div');
+    submitInline.style.marginTop = '8px';
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'btn-primary';
+    submitBtn.textContent = 'Save Answer & Next';
+    submitBtn.addEventListener('click', ()=> {
+      const val = input.value.trim();
+      if(val==='') {
+        // mark as unanswered if blank
+        answers[currentIndex] = null;
+        updateQnumState(currentIndex);
+        // jump next anyway
+        changeQuestion(currentIndex+1);
+        return;
+      }
+      answers[currentIndex] = val;
+      updateQnumState(currentIndex);
+      // jump to next question
+      changeQuestion(currentIndex+1);
+    });
+    submitInline.appendChild(submitBtn);
+    choicesWrap.appendChild(submitInline);
+  }
+}
+
+/* show immediate feedback for choices coloring */
+function showChoiceFeedback(selectedChoice){
+  const q = questions[currentIndex];
+  const btns = choicesWrap.querySelectorAll('.choice-btn');
+  btns.forEach(b=>{
+    if(b.textContent === q.a) b.classList.add('correct');
+    if(b.textContent === selectedChoice && selectedChoice !== q.a) b.classList.add('wrong');
+    // keep others neutral but slightly faded
+    if(b.textContent !== q.a && b.textContent !== selectedChoice) b.style.opacity = '0.92';
+  });
+}
+
+/* change question index */
+function changeQuestion(newIndex){
+  // clamp
+  if(newIndex < 0) newIndex = 0;
+  if(newIndex >= TOTAL) newIndex = TOTAL-1;
+  currentIndex = newIndex;
+  renderCurrentQuestion();
+}
+
+/* finalize quiz - auto when time up or user submits
+   if autoTimeUp = true then show message accordingly */
+function finalizeQuiz(autoTimeUp = false){
+  stopTimer();
+  // calculate score
+  let score = 0;
+  if(mode === 'mcq'){
+    for(let i=0;i<TOTAL;i++){
+      if(answers[i] && answers[i] === questions[i].a) score++;
+    }
+  } else {
+    for(let i=0;i<TOTAL;i++){
+      if(answers[i] && answers[i].toString().trim().toLowerCase() === questions[i].a.toString().trim().toLowerCase()) score++;
+    }
+  }
+
+  // prepare unanswered list
+  const unanswered = answers.reduce((acc,val,idx)=> (val===null? acc.concat(idx+1):acc), []);
+  resultTitle.textContent = autoTimeUp ? "Time's up — Test Completed" : "Quiz Submitted";
+  resultBody.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">Score: ${score} / ${TOTAL}</div>
+    <div style="font-size:13px;color:#666">Answered: ${answers.filter(a=>a!==null).length}  •  Unanswered: ${unanswered.length}</div>
+    <div style="margin-top:12px;text-align:left">
+      <strong>Notes:</strong>
+      <ul style="padding-left:18px;margin-top:8px">
+        <li>Answered questions are marked green on the left.</li>
+        <li>Unanswered questions are marked red on the left.</li>
+      </ul>
+    </div>
+  `;
+  overlay.classList.add('show');
+}
+
+/* close modal */
+function closeModal(){ overlay.classList.remove('show'); }
+
+/* restart quiz (keeps same mode) */
+function startOver(){
+  overlay.classList.remove('show');
+  if(!mode) return showStartMenu();
+  answers = Array(TOTAL).fill(null);
+  currentIndex = 0;
+  overallTime = 300;
+  renderQuestionNums();
+  renderCurrentQuestion();
+  startOverallTimer();
+}
+
+/* toggle dark / light appearance across whole page */
+function toggleDark(){
+  isDark = !isDark;
+  if(isDark){
+    document.body.classList.add('dark');
+    rootWrapper.style.background = 'var(--dark-bg)';
+    document.getElementById('modeToggle').textContent = '☀️ Light';
+  } else {
+    document.body.classList.remove('dark');
+    rootWrapper.style.background = 'var(--light-bg)';
+    document.getElementById('modeToggle').textContent = '🌙 Dark';
+  }
+}
+
+/* initial background */
+rootWrapper.style.background = 'linear-gradient(135deg,#e9e2fb,#d6ccf9)';
+
+/* Ensure page resize keeps correct layout (re-render qnums current class) */
+window.addEventListener('resize', ()=> renderQuestionNums());
+
+/* Make sure default controls behave if user navigates next/prev beyond ends */
+document.getElementById('prevBtn').addEventListener('click', ()=> {
+  if(currentIndex > 0) changeQuestion(currentIndex-1);
+});
+document.getElementById('nextBtn').addEventListener('click', ()=> {
+  if(currentIndex < TOTAL-1) changeQuestion(currentIndex+1);
+});
+
+/* Clicking Main Menu returns to start */
+document.getElementById('mainMenuBtn').addEventListener('click', showStartMenu);
+document.getElementById('mainMenuBtnBottom').addEventListener('click', showStartMenu);
+
+/* Keyboard navigation: left/right arrows for prev/next */
+document.addEventListener('keydown', (e)=>{
+  if(!mode) return;
+  if(e.key === 'ArrowLeft') { if(currentIndex>0) changeQuestion(currentIndex-1) }
+  if(e.key === 'ArrowRight') { if(currentIndex<TOTAL-1) changeQuestion(currentIndex+1) }
+});
+
+/* Accessibility: click qnum to go that question already handled when rendering */
+
+</script>
+</body>
+</html>
